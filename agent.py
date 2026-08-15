@@ -57,6 +57,13 @@ def get_calendar_events(date: str) -> list:
         {"time": "14:00", "title": "Dentist appointment"},
     ]
    
+
+def get_emails() -> list:
+    return [
+        {"from": "manager@company.com", "subject": "Q3 planning", "body": "Let's sync on Q3 planning next week."},
+        {"from": "hr@company.com", "subject": "Benefits enrollment", "body": "Reminder: benefits enrollment closes this Friday."},
+    ]
+
    
 def parse_response(text: str) -> dict:
     try:
@@ -108,7 +115,6 @@ def agent_loop(user_input: str, max_turns: int = 5):
     return "Error: exceeded maximum number of turns without a final answer."
 
 
-answer = agent_loop("What's on my calendar tomorrow?")
-print(answer)    
+
     
     

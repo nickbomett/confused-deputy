@@ -7,6 +7,26 @@ from datetime import datetime, timezone
 SESSION_ID = str(uuid.uuid4())
 
 
+def build_system_prompt() -> str:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return f"""You are an assistant with access to one tool.
+
+Today's date is {today}.
+
+Tool: get_calendar_events
+Description: Returns the events on the user's calendar for a given date.
+Arguments: date (string, format YYYY-MM-DD)
+
+You must respond with exactly one of these two JSON formats, and nothing else — no explanation, no text before or after the JSON.
+
+To call the tool:
+{{"type": "tool_call", "name": "get_calendar_events", "args": {{"date": "YYYY-MM-DD"}}}}
+
+To give your final answer:
+{{"type": "final_answer", "content": "your answer here"}}
+"""
+
+
 def log_event(event_type: str, data: dict):
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -36,6 +56,59 @@ def get_calendar_events(date: str) -> list:
         {"time": "10.00", "title": "Team standup"},
         {"time": "14:00", "title": "Dentist appointment"},
     ]
+   
+   
+def parse_response(text: str) -> dict:
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return {"type": "parse_error", "raw": text}
+
+    if parsed.get("type") == "tool_call":
+        return {"type": "tool_call", "name": parsed.get("name"), "args": parsed.get("args", {})}
+    elif parsed.get("type") == "final_answer":
+        return {"type": "final_answer", "content": parsed.get("content")}
+    else:
+        return {"type": "parse_error", "raw": text}   
     
+     
+def agent_loop(user_input: str, max_turns: int = 5):
+    log_event("user_input", {"content": user_input})
+    messages = [
+        {"role": "system", "content": build_system_prompt()},
+        {"role": "user", "content": user_input},
+    ]
+
+    for turn in range(max_turns):
+        reply = call_model(messages)
+        result = parse_response(reply)
+
+        if result["type"] == "tool_call":
+            log_event("tool_call", {"name": result["name"], "args": result["args"]})
+
+            if result["name"] == "get_calendar_events":
+                tool_result = get_calendar_events(result["args"].get("date"))
+            else:
+                tool_result = {"error": f"Unknown tool: {result['name']}"}
+
+            log_event("tool_result", {"name": result["name"], "result": tool_result})
+
+            messages.append({"role": "assistant", "content": reply})
+            messages.append({"role": "user", "content": f"Tool result: {json.dumps(tool_result)}"})
+
+        elif result["type"] == "final_answer":
+            log_event("final_answer", {"content": result["content"]})
+            return result["content"]
+
+        else:
+            log_event("parse_error", {"raw": result["raw"]})
+            return "Error: could not parse model's response."
+
+    log_event("max_turns_exceeded", {})
+    return "Error: exceeded maximum number of turns without a final answer."
+
+
+answer = agent_loop("What's on my calendar tomorrow?")
+print(answer)    
     
     

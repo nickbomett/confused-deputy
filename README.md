@@ -14,7 +14,11 @@ rather than one poisoned prompt.
 
 ## Status
 
-Early build. Milestone 1 (single-tool agent loop) in progress.
+## Status
+
+Milestone 1 complete — single-tool agent loop working end-to-end 
+(logging, model calls, tool execution, response parsing) against a 
+local Ollama model. Milestone 2 in progress: expanding to multiple tools.
 
 ## Related work
 

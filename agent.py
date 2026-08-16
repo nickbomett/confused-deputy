@@ -9,7 +9,7 @@ SESSION_ID = str(uuid.uuid4())
 
 def build_system_prompt() -> str:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    return f"""You are an assistant with access to one tool.
+    return f"""You are an assistant with access to two tools.
 
 Today's date is {today}.
 
@@ -17,10 +17,14 @@ Tool: get_calendar_events
 Description: Returns the events on the user's calendar for a given date.
 Arguments: date (string, format YYYY-MM-DD)
 
+Tool: get_emails
+Description: Returns the user's recent emails.
+Arguments: none
+
 You must respond with exactly one of these two JSON formats, and nothing else — no explanation, no text before or after the JSON.
 
-To call the tool:
-{{"type": "tool_call", "name": "get_calendar_events", "args": {{"date": "YYYY-MM-DD"}}}}
+To call a tool:
+{{"type": "tool_call", "name": "<tool name>", "args": {{...}}}}
 
 To give your final answer:
 {{"type": "final_answer", "content": "your answer here"}}
@@ -79,6 +83,12 @@ def parse_response(text: str) -> dict:
         return {"type": "parse_error", "raw": text}   
     
      
+TOOLS = {
+    "get_calendar_events": get_calendar_events,
+    "get_emails": get_emails,
+}
+
+
 def agent_loop(user_input: str, max_turns: int = 5):
     log_event("user_input", {"content": user_input})
     messages = [
@@ -93,8 +103,9 @@ def agent_loop(user_input: str, max_turns: int = 5):
         if result["type"] == "tool_call":
             log_event("tool_call", {"name": result["name"], "args": result["args"]})
 
-            if result["name"] == "get_calendar_events":
-                tool_result = get_calendar_events(result["args"].get("date"))
+            tool_function = TOOLS.get(result["name"])
+            if tool_function:
+                tool_result = tool_function(**result["args"])
             else:
                 tool_result = {"error": f"Unknown tool: {result['name']}"}
 
